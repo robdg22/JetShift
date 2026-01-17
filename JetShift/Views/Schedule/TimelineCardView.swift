@@ -13,7 +13,7 @@ struct TimelineCardView: View {
     @State private var tapped = false
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             // Day label and date
             VStack(alignment: .leading, spacing: 2) {
                 Text(schedule.dayLabel)
@@ -25,6 +25,9 @@ struct TimelineCardView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
+            
+            // Body clock offset indicator
+            bodyClockIndicator
             
             Divider()
             
@@ -45,7 +48,7 @@ struct TimelineCardView: View {
             .foregroundStyle(schedule.stage.color)
         }
         .padding()
-        .frame(width: schedule.hasStrategy ? 160 : 140)
+        .frame(width: schedule.hasStrategy ? 170 : 150)
         .glassEffect()
         .overlay {
             if schedule.isToday {
@@ -73,13 +76,54 @@ struct TimelineCardView: View {
         .sensoryFeedback(.selection, trigger: tapped)
     }
     
+    // MARK: - Body Clock Indicator
+    
+    private var bodyClockIndicator: some View {
+        HStack(spacing: 4) {
+            Image(systemName: bodyClockIcon)
+                .font(.caption2)
+            Text(schedule.formattedBodyClockOffset)
+                .font(.caption2)
+                .fontWeight(.medium)
+        }
+        .foregroundStyle(bodyClockColor)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(bodyClockColor.opacity(0.15))
+        .clipShape(Capsule())
+    }
+    
+    private var bodyClockIcon: String {
+        if schedule.isInSync {
+            return "checkmark.circle.fill"
+        } else if schedule.bodyClockOffsetMinutes > 0 {
+            return "arrow.forward.circle.fill"
+        } else {
+            return "arrow.backward.circle.fill"
+        }
+    }
+    
+    private var bodyClockColor: Color {
+        if schedule.isInSync {
+            return .green
+        }
+        let absOffset = abs(schedule.bodyClockOffsetMinutes)
+        if absOffset <= 60 {
+            return .green
+        } else if absOffset <= 180 {
+            return .yellow
+        } else {
+            return .red
+        }
+    }
+    
     // MARK: - Travel Day Content
     
     private var travelDayContent: some View {
         VStack(alignment: .leading, spacing: 10) {
             // Strategy message
             if let strategy = schedule.strategyMessage {
-                HStack(spacing: 6) {
+                HStack(alignment: .top, spacing: 6) {
                     Image(systemName: strategyIcon)
                         .font(.subheadline)
                         .foregroundStyle(schedule.stage.color)
@@ -88,6 +132,7 @@ struct TimelineCardView: View {
                         .font(.caption)
                         .fontWeight(.medium)
                         .foregroundStyle(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             
@@ -172,7 +217,7 @@ struct TimelineCardView: View {
         case .west:
             return "moon.stars.fill"
         case .east:
-            return "bed.double.fill"
+            return "sunrise.fill"
         case .none, nil:
             return "clock.fill"
         }
@@ -184,10 +229,12 @@ struct TimelineCardView: View {
         HStack(spacing: 16) {
             TimelineCardView(schedule: DailySchedule(
                 date: Date(),
-                dayLabel: "2 days before",
+                dayLabel: "3 days before",
                 bedtime: Date(),
                 wakeTime: Date(),
-                stage: .preAdjustment
+                stage: .preAdjustment,
+                travelDirection: .east,
+                bodyClockOffsetMinutes: -270
             ))
             
             TimelineCardView(schedule: DailySchedule(
@@ -196,17 +243,30 @@ struct TimelineCardView: View {
                 bedtime: Date(),
                 wakeTime: Date(),
                 stage: .travelDay,
-                strategyMessage: "Stay up as late as possible",
+                strategyMessage: "Short morning nap if tired, then stay awake as long as possible",
                 hotelArrival: Date(),
-                travelDirection: .west
+                travelDirection: .east,
+                bodyClockOffsetMinutes: -180
             ))
             
             TimelineCardView(schedule: DailySchedule(
                 date: Date(),
-                dayLabel: "Day 1",
+                dayLabel: "Day 2",
                 bedtime: Date(),
                 wakeTime: Date(),
-                stage: .postArrival
+                stage: .postArrival,
+                travelDirection: .east,
+                bodyClockOffsetMinutes: -60
+            ))
+            
+            TimelineCardView(schedule: DailySchedule(
+                date: Date(),
+                dayLabel: "Day 4",
+                bedtime: Date(),
+                wakeTime: Date(),
+                stage: .postArrival,
+                travelDirection: .east,
+                bodyClockOffsetMinutes: 0
             ))
         }
         .padding()

@@ -26,6 +26,10 @@ struct DailySchedule: Identifiable, Equatable {
     /// Travel direction for context
     let travelDirection: TravelDirection?
     
+    /// Body clock offset in minutes (positive = ahead of local, negative = behind local)
+    /// Shows how out of sync the body clock is with destination time
+    let bodyClockOffsetMinutes: Int
+    
     init(
         date: Date,
         dayLabel: String,
@@ -34,7 +38,8 @@ struct DailySchedule: Identifiable, Equatable {
         stage: ScheduleStage,
         strategyMessage: String? = nil,
         hotelArrival: Date? = nil,
-        travelDirection: TravelDirection? = nil
+        travelDirection: TravelDirection? = nil,
+        bodyClockOffsetMinutes: Int = 0
     ) {
         self.date = date
         self.dayLabel = dayLabel
@@ -44,6 +49,7 @@ struct DailySchedule: Identifiable, Equatable {
         self.strategyMessage = strategyMessage
         self.hotelArrival = hotelArrival
         self.travelDirection = travelDirection
+        self.bodyClockOffsetMinutes = bodyClockOffsetMinutes
     }
     
     /// Whether this schedule is for today
@@ -54,6 +60,31 @@ struct DailySchedule: Identifiable, Equatable {
     /// Whether this is a travel day with a strategy message
     var hasStrategy: Bool {
         strategyMessage != nil
+    }
+    
+    /// Whether the body clock is in sync (within 30 minutes)
+    var isInSync: Bool {
+        abs(bodyClockOffsetMinutes) < 30
+    }
+    
+    /// Formatted body clock offset string (e.g., "+3 hrs off", "-1.5 hrs off", "In sync")
+    var formattedBodyClockOffset: String {
+        if isInSync {
+            return "In sync"
+        }
+        
+        let hours = Double(bodyClockOffsetMinutes) / 60.0
+        let absHours = abs(hours)
+        let sign = hours > 0 ? "+" : ""
+        
+        if absHours == absHours.rounded() {
+            // Whole hours
+            let hrs = Int(absHours)
+            return "\(sign)\(hrs == 1 ? "1 hr" : "\(hrs) hrs") off"
+        } else {
+            // Half hours
+            return String(format: "%@%.1f hrs off", sign, hours)
+        }
     }
     
     /// Formatted bedtime string
