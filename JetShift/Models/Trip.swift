@@ -11,18 +11,18 @@ import SwiftData
 /// Represents a complete trip with outbound and optional return flights
 @Model
 final class Trip {
-    var id: UUID
-    var name: String
-    var homeTimezone: String
+    var id: UUID = UUID()
+    var name: String = ""
+    var homeTimezone: String = ""
     
     // Flights stored as Codable structs
-    var outboundFlightData: Data?
-    var returnFlightData: Data?
+    var outboundFlightData: Data? = nil
+    var returnFlightData: Data? = nil
     
     // Strategy stored as Codable
-    var strategyData: Data?
+    var strategyData: Data? = nil
     
-    var createdAt: Date
+    var createdAt: Date = Date()
     
     init(
         id: UUID = UUID(),

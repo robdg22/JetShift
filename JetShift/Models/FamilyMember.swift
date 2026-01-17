@@ -10,24 +10,24 @@ import SwiftData
 
 @Model
 final class FamilyMember {
-    var id: UUID
-    var name: String
-    var age: Int
-    var currentBedtime: Date
-    var currentWakeTime: Date
-    var createdAt: Date
+    var id: UUID = UUID()
+    var name: String = ""
+    var age: Int = 0
+    var currentBedtime: Date = Date()
+    var currentWakeTime: Date = Date()
+    var createdAt: Date = Date()
     
     /// Whether this person has a fixed wake constraint (work/school)
-    var hasWakeConstraint: Bool
+    var hasWakeConstraint: Bool = true
     
     /// The latest time they must wake by on normal days (work/school)
-    var wakeByTime: Date
+    var wakeByTime: Date = Date()
     
     /// Whether this member uses a custom strategy (vs trip default)
-    var usesCustomStrategy: Bool
+    var usesCustomStrategy: Bool = false
     
     /// Custom strategy data (if usesCustomStrategy is true)
-    var customStrategyData: Data?
+    var customStrategyData: Data? = nil
     
     init(
         id: UUID = UUID(),
