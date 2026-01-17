@@ -17,12 +17,20 @@ final class FamilyMember {
     var currentWakeTime: Date
     var createdAt: Date
     
+    /// Whether this person has a fixed wake constraint (work/school)
+    var hasWakeConstraint: Bool
+    
+    /// The latest time they must wake by on normal days (work/school)
+    var wakeByTime: Date
+    
     init(
         id: UUID = UUID(),
         name: String,
         age: Int,
         currentBedtime: Date,
         currentWakeTime: Date,
+        hasWakeConstraint: Bool = true,
+        wakeByTime: Date? = nil,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -30,7 +38,36 @@ final class FamilyMember {
         self.age = age
         self.currentBedtime = currentBedtime
         self.currentWakeTime = currentWakeTime
+        self.hasWakeConstraint = hasWakeConstraint
+        self.wakeByTime = wakeByTime ?? FamilyMember.defaultWakeByTime(for: age)
         self.createdAt = createdAt
+    }
+    
+    /// Default wake-by time based on age (7am for most, earlier for young kids)
+    static func defaultWakeByTime(for age: Int) -> Date {
+        let calendar = Calendar.current
+        var components = DateComponents()
+        
+        switch age {
+        case 0...5:
+            // Young children - no fixed constraint typically
+            components.hour = 7
+            components.minute = 0
+        case 6...12:
+            // School age - need to be ready for school
+            components.hour = 7
+            components.minute = 0
+        case 13...17:
+            // Teens - school
+            components.hour = 7
+            components.minute = 0
+        default:
+            // Adults - work
+            components.hour = 7
+            components.minute = 0
+        }
+        
+        return calendar.date(from: components) ?? Date()
     }
     
     /// Returns the recommended sleep duration in hours based on age
@@ -83,6 +120,11 @@ final class FamilyMember {
     /// Formatted wake time string
     var formattedWakeTime: String {
         currentWakeTime.formatted(date: .omitted, time: .shortened)
+    }
+    
+    /// Formatted wake-by time string
+    var formattedWakeByTime: String {
+        wakeByTime.formatted(date: .omitted, time: .shortened)
     }
     
     /// Returns suggested bedtime based on age

@@ -204,19 +204,35 @@ struct JetLagCalculator {
             let adjustedBedtime: Date
             let adjustedWakeTime: Date
             
+            var proposedBedtime: Date
+            var proposedWakeTime: Date
+            
             switch direction {
             case .east:
-                // Eastward travel: shift earlier
-                adjustedBedtime = adjustTime(member.currentBedtime, byMinutes: -totalAdjustedMinutes)
-                adjustedWakeTime = adjustTime(member.currentWakeTime, byMinutes: -totalAdjustedMinutes)
+                // Eastward travel: shift earlier (waking earlier is fine for constraint)
+                proposedBedtime = adjustTime(member.currentBedtime, byMinutes: -totalAdjustedMinutes)
+                proposedWakeTime = adjustTime(member.currentWakeTime, byMinutes: -totalAdjustedMinutes)
             case .west:
-                // Westward travel: shift later
-                adjustedBedtime = adjustTime(member.currentBedtime, byMinutes: totalAdjustedMinutes)
-                adjustedWakeTime = adjustTime(member.currentWakeTime, byMinutes: totalAdjustedMinutes)
+                // Westward travel: shift later (might violate wake constraint)
+                proposedBedtime = adjustTime(member.currentBedtime, byMinutes: totalAdjustedMinutes)
+                proposedWakeTime = adjustTime(member.currentWakeTime, byMinutes: totalAdjustedMinutes)
             case .none:
-                adjustedBedtime = member.currentBedtime
-                adjustedWakeTime = member.currentWakeTime
+                proposedBedtime = member.currentBedtime
+                proposedWakeTime = member.currentWakeTime
             }
+            
+            // Apply wake constraint (clamp wake time if it exceeds work/school requirement)
+            let clampedWakeTime = clampToWakeConstraint(wakeTime: proposedWakeTime, member: member, calendar: calendar)
+            let finalBedtime = adjustBedtimeForClampedWake(
+                originalBedtime: proposedBedtime,
+                originalWakeTime: proposedWakeTime,
+                clampedWakeTime: clampedWakeTime,
+                member: member,
+                calendar: calendar
+            )
+            
+            adjustedBedtime = finalBedtime
+            adjustedWakeTime = clampedWakeTime
             
             // Body clock offset
             let remainingOffset = targetAdjustmentMinutes - totalAdjustedMinutes
@@ -559,16 +575,27 @@ struct JetLagCalculator {
             let recoveryProgress = min(dayOffset * increment, abs(originalOutbound.timezoneOffset) * 60)
             
             // Gradual return to normal home schedule
-            let adjustedBedtime = adjustTime(member.currentBedtime, byMinutes: Int((1.0 - Double(dayOffset) / Double(actualRecoveryDays)) * Double(increment)))
-            let adjustedWakeTime = adjustTime(member.currentWakeTime, byMinutes: Int((1.0 - Double(dayOffset) / Double(actualRecoveryDays)) * Double(increment)))
+            let remainingAdjustment = Int((1.0 - Double(dayOffset) / Double(actualRecoveryDays)) * Double(increment))
+            let proposedBedtime = adjustTime(member.currentBedtime, byMinutes: remainingAdjustment)
+            let proposedWakeTime = adjustTime(member.currentWakeTime, byMinutes: remainingAdjustment)
+            
+            // Apply wake constraint (critical for post-return as person needs to get to work/school)
+            let clampedWakeTime = clampToWakeConstraint(wakeTime: proposedWakeTime, member: member, calendar: calendar)
+            let finalBedtime = adjustBedtimeForClampedWake(
+                originalBedtime: proposedBedtime,
+                originalWakeTime: proposedWakeTime,
+                clampedWakeTime: clampedWakeTime,
+                member: member,
+                calendar: calendar
+            )
             
             let remainingOffset = max(0, abs(originalOutbound.timezoneOffset) * 60 - recoveryProgress)
             
             schedules.append(DailySchedule(
                 date: date,
                 dayLabel: "Recovery Day \(dayOffset)",
-                bedtime: adjustedBedtime,
-                wakeTime: adjustedWakeTime,
+                bedtime: finalBedtime,
+                wakeTime: clampedWakeTime,
                 stage: .postReturn,
                 travelDirection: returnFlight.travelDirection,
                 bodyClockOffsetMinutes: remainingOffset
@@ -597,5 +624,68 @@ struct JetLagCalculator {
             return "1 day before"
         }
         return "\(daysRemaining) days before"
+    }
+    
+    /// Clamps wake time to not exceed the member's wake-by constraint
+    /// - Parameters:
+    ///   - wakeTime: The proposed wake time
+    ///   - member: The family member with potential wake constraint
+    ///   - calendar: Calendar for date calculations
+    /// - Returns: The clamped wake time (no later than wake-by if constraint exists)
+    private static func clampToWakeConstraint(
+        wakeTime: Date,
+        member: FamilyMember,
+        calendar: Calendar
+    ) -> Date {
+        guard member.hasWakeConstraint else { return wakeTime }
+        
+        // Extract time components from both dates
+        let wakeComponents = calendar.dateComponents([.hour, .minute], from: wakeTime)
+        let constraintComponents = calendar.dateComponents([.hour, .minute], from: member.wakeByTime)
+        
+        let wakeMinutes = (wakeComponents.hour ?? 0) * 60 + (wakeComponents.minute ?? 0)
+        let constraintMinutes = (constraintComponents.hour ?? 0) * 60 + (constraintComponents.minute ?? 0)
+        
+        // If wake time is later than constraint, clamp it
+        if wakeMinutes > constraintMinutes {
+            // Return the constraint time on the same "day" as the wake time
+            var components = calendar.dateComponents([.year, .month, .day], from: wakeTime)
+            components.hour = constraintComponents.hour
+            components.minute = constraintComponents.minute
+            return calendar.date(from: components) ?? wakeTime
+        }
+        
+        return wakeTime
+    }
+    
+    /// Adjusts bedtime to maintain sleep duration when wake time is clamped
+    /// - Parameters:
+    ///   - originalBedtime: The originally calculated bedtime
+    ///   - originalWakeTime: The originally calculated wake time
+    ///   - clampedWakeTime: The wake time after constraint clamping
+    ///   - member: The family member
+    ///   - calendar: Calendar for date calculations
+    /// - Returns: Adjusted bedtime to maintain similar sleep duration
+    private static func adjustBedtimeForClampedWake(
+        originalBedtime: Date,
+        originalWakeTime: Date,
+        clampedWakeTime: Date,
+        member: FamilyMember,
+        calendar: Calendar
+    ) -> Date {
+        // If wake wasn't clamped, return original bedtime
+        let originalWakeComponents = calendar.dateComponents([.hour, .minute], from: originalWakeTime)
+        let clampedWakeComponents = calendar.dateComponents([.hour, .minute], from: clampedWakeTime)
+        
+        let originalWakeMinutes = (originalWakeComponents.hour ?? 0) * 60 + (originalWakeComponents.minute ?? 0)
+        let clampedWakeMinutes = (clampedWakeComponents.hour ?? 0) * 60 + (clampedWakeComponents.minute ?? 0)
+        
+        if originalWakeMinutes == clampedWakeMinutes {
+            return originalBedtime
+        }
+        
+        // Wake was clamped earlier, so shift bedtime earlier by the same amount
+        let clampedByMinutes = originalWakeMinutes - clampedWakeMinutes
+        return adjustTime(originalBedtime, byMinutes: -clampedByMinutes)
     }
 }

@@ -97,8 +97,17 @@ struct FamilyMemberRow: View {
                 .frame(width: 32)
             
             VStack(alignment: .leading, spacing: 4) {
-                Text(member.name)
-                    .font(.headline)
+                HStack(spacing: 6) {
+                    Text(member.name)
+                        .font(.headline)
+                    
+                    // Show work/school badge if has wake constraint
+                    if member.hasWakeConstraint {
+                        Image(systemName: "briefcase.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.blue)
+                    }
+                }
                 
                 Text("\(member.age) years old")
                     .font(.subheadline)
@@ -122,6 +131,17 @@ struct FamilyMemberRow: View {
                         .foregroundStyle(.orange)
                     Text(member.formattedWakeTime)
                         .font(.subheadline)
+                }
+                
+                // Show wake-by constraint if enabled
+                if member.hasWakeConstraint {
+                    HStack(spacing: 4) {
+                        Image(systemName: "alarm.fill")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                        Text("by \(member.formattedWakeByTime)")
+                            .font(.caption)
+                    }
                 }
             }
             .foregroundStyle(.secondary)

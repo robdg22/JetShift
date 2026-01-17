@@ -37,6 +37,8 @@ struct FamilyMemberFormView: View {
     @State private var age: Int = 30
     @State private var bedtime: Date = Date()
     @State private var wakeTime: Date = Date()
+    @State private var hasWakeConstraint: Bool = true
+    @State private var wakeByTime: Date = Date()
     
     @State private var showValidationError = false
     @State private var didSave = false
@@ -53,9 +55,12 @@ struct FamilyMemberFormView: View {
             _age = State(initialValue: member.age)
             _bedtime = State(initialValue: member.currentBedtime)
             _wakeTime = State(initialValue: member.currentWakeTime)
+            _hasWakeConstraint = State(initialValue: member.hasWakeConstraint)
+            _wakeByTime = State(initialValue: member.wakeByTime)
         } else {
             _bedtime = State(initialValue: FamilyMember.suggestedBedtime(for: 30))
             _wakeTime = State(initialValue: FamilyMember.suggestedWakeTime(for: 30))
+            _wakeByTime = State(initialValue: FamilyMember.defaultWakeByTime(for: 30))
         }
     }
     
@@ -77,6 +82,7 @@ struct FamilyMemberFormView: View {
                             withAnimation(.smooth) {
                                 bedtime = FamilyMember.suggestedBedtime(for: newValue)
                                 wakeTime = FamilyMember.suggestedWakeTime(for: newValue)
+                                wakeByTime = FamilyMember.defaultWakeByTime(for: newValue)
                             }
                         }
                     }
@@ -94,6 +100,28 @@ struct FamilyMemberFormView: View {
                         selection: $wakeTime,
                         displayedComponents: .hourAndMinute
                     )
+                }
+                
+                Section {
+                    Toggle("Has Work/School Schedule", isOn: $hasWakeConstraint.animation(.smooth))
+                    
+                    if hasWakeConstraint {
+                        DatePicker(
+                            "Must Wake By",
+                            selection: $wakeByTime,
+                            displayedComponents: .hourAndMinute
+                        )
+                        
+                        Text("Schedule adjustments before and after the trip will respect this wake time constraint.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("Wake Constraint")
+                } footer: {
+                    if !hasWakeConstraint {
+                        Text("Enable if this person has work or school that requires waking by a certain time.")
+                    }
                 }
                 
                 Section {
@@ -139,7 +167,9 @@ struct FamilyMemberFormView: View {
                 name: name.trimmingCharacters(in: .whitespacesAndNewlines),
                 age: age,
                 currentBedtime: bedtime,
-                currentWakeTime: wakeTime
+                currentWakeTime: wakeTime,
+                hasWakeConstraint: hasWakeConstraint,
+                wakeByTime: wakeByTime
             )
             modelContext.insert(member)
             
@@ -148,6 +178,8 @@ struct FamilyMemberFormView: View {
             member.age = age
             member.currentBedtime = bedtime
             member.currentWakeTime = wakeTime
+            member.hasWakeConstraint = hasWakeConstraint
+            member.wakeByTime = wakeByTime
         }
         
         didSave.toggle()
