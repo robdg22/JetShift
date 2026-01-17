@@ -213,12 +213,15 @@ struct TimelineCardView: View {
     // MARK: - Helper
     
     private var strategyIcon: String {
-        switch schedule.travelDirection {
+        guard let direction = schedule.travelDirection else {
+            return "clock.fill"
+        }
+        switch direction {
         case .west:
             return "moon.stars.fill"
         case .east:
             return "sunrise.fill"
-        case .none, nil:
+        case .none:
             return "clock.fill"
         }
     }

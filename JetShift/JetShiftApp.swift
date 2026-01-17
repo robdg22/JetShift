@@ -13,7 +13,7 @@ struct JetShiftApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             FamilyMember.self,
-            Flight.self
+            Trip.self
         ])
         let modelConfiguration = ModelConfiguration(
             schema: schema,

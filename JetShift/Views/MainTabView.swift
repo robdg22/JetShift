@@ -13,13 +13,13 @@ struct MainTabView: View {
     
     enum Tab: String, CaseIterable {
         case family = "Family"
-        case flight = "Flight"
+        case trip = "Trip"
         case schedule = "Schedule"
         
         var icon: String {
             switch self {
             case .family: return "person.3.fill"
-            case .flight: return "airplane.departure"
+            case .trip: return "airplane.departure"
             case .schedule: return "calendar"
             }
         }
@@ -43,8 +43,8 @@ struct MainTabView: View {
         switch tab {
         case .family:
             FamilyView()
-        case .flight:
-            FlightView()
+        case .trip:
+            TripView()
         case .schedule:
             ScheduleView()
         }
@@ -53,5 +53,5 @@ struct MainTabView: View {
 
 #Preview {
     MainTabView()
-        .modelContainer(for: [FamilyMember.self, Flight.self], inMemory: true)
+        .modelContainer(for: [FamilyMember.self, Trip.self], inMemory: true)
 }

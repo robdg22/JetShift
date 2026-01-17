@@ -22,5 +22,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: [FamilyMember.self, Flight.self], inMemory: true)
+        .modelContainer(for: [FamilyMember.self, Trip.self], inMemory: true)
 }

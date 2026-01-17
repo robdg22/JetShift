@@ -6,10 +6,9 @@
 //
 
 import Foundation
-import SwiftData
 
-@Model
-final class Flight {
+/// Represents flight details - now a Codable struct embedded in Trip
+struct FlightDetails: Codable, Hashable, Identifiable, Sendable {
     var id: UUID
     var departureCity: String
     var departureTimezone: String
@@ -19,7 +18,6 @@ final class Flight {
     var departureTime: Date
     var arrivalDate: Date
     var arrivalTime: Date
-    var createdAt: Date
     
     init(
         id: UUID = UUID(),
@@ -30,8 +28,7 @@ final class Flight {
         departureDate: Date,
         departureTime: Date,
         arrivalDate: Date,
-        arrivalTime: Date,
-        createdAt: Date = Date()
+        arrivalTime: Date
     ) {
         self.id = id
         self.departureCity = departureCity
@@ -42,7 +39,6 @@ final class Flight {
         self.departureTime = departureTime
         self.arrivalDate = arrivalDate
         self.arrivalTime = arrivalTime
-        self.createdAt = createdAt
     }
     
     /// Calculates the timezone difference in hours (positive = eastward, negative = westward)
@@ -112,9 +108,43 @@ final class Flight {
     var formattedDepartureTime: String {
         departureTime.formatted(date: .omitted, time: .shortened)
     }
+    
+    /// Formatted arrival time
+    var formattedArrivalTime: String {
+        arrivalTime.formatted(date: .omitted, time: .shortened)
+    }
+    
+    /// Creates a default outbound flight
+    static func defaultOutbound() -> FlightDetails {
+        FlightDetails(
+            departureCity: "New York",
+            departureTimezone: "America/New_York",
+            arrivalCity: "London",
+            arrivalTimezone: "Europe/London",
+            departureDate: Date(),
+            departureTime: Date(),
+            arrivalDate: Date(),
+            arrivalTime: Date()
+        )
+    }
+    
+    /// Creates a return flight based on outbound (swapped cities)
+    func createReturnFlight(returnDate: Date) -> FlightDetails {
+        FlightDetails(
+            departureCity: arrivalCity,
+            departureTimezone: arrivalTimezone,
+            arrivalCity: departureCity,
+            arrivalTimezone: departureTimezone,
+            departureDate: returnDate,
+            departureTime: Date(),
+            arrivalDate: returnDate,
+            arrivalTime: Date()
+        )
+    }
 }
 
-enum TravelDirection {
+/// Travel direction for timezone shifts
+enum TravelDirection: Codable, Hashable, Sendable {
     case east
     case west
     case none
@@ -124,6 +154,15 @@ enum TravelDirection {
         case .east: return "Eastward"
         case .west: return "Westward"
         case .none: return "No change"
+        }
+    }
+    
+    /// Opposite direction (for return flights)
+    var opposite: TravelDirection {
+        switch self {
+        case .east: return .west
+        case .west: return .east
+        case .none: return .none
         }
     }
 }

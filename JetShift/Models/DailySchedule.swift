@@ -110,19 +110,32 @@ struct DailySchedule: Identifiable, Equatable {
 
 /// Represents the stage of the jet lag adjustment plan
 enum ScheduleStage: Equatable {
-    case preAdjustment
-    case travelDay
-    case postArrival
+    case preAdjustment          // Before outbound flight
+    case travelDayOutbound      // Outbound flight day
+    case atDestination          // During trip at destination
+    case preReturn              // 2 days before return flight
+    case travelDayReturn        // Return flight day
+    case postReturn             // Recovery at home after return
+    
+    // Legacy cases for backward compatibility
+    case travelDay              // Alias for travelDayOutbound
+    case postArrival            // Alias for atDestination
     
     /// Color associated with this stage
     var color: Color {
         switch self {
         case .preAdjustment:
             return .blue
-        case .travelDay:
+        case .travelDayOutbound, .travelDay:
             return .orange
-        case .postArrival:
+        case .atDestination, .postArrival:
             return .green
+        case .preReturn:
+            return .purple
+        case .travelDayReturn:
+            return .orange
+        case .postReturn:
+            return .teal
         }
     }
     
@@ -131,10 +144,16 @@ enum ScheduleStage: Equatable {
         switch self {
         case .preAdjustment:
             return "clock.arrow.circlepath"
-        case .travelDay:
-            return "airplane"
-        case .postArrival:
-            return "checkmark.circle"
+        case .travelDayOutbound, .travelDay:
+            return "airplane.departure"
+        case .atDestination, .postArrival:
+            return "mappin.circle"
+        case .preReturn:
+            return "arrow.uturn.left.circle"
+        case .travelDayReturn:
+            return "airplane.arrival"
+        case .postReturn:
+            return "house.circle"
         }
     }
     
@@ -142,11 +161,35 @@ enum ScheduleStage: Equatable {
     var description: String {
         switch self {
         case .preAdjustment:
-            return "Pre-flight adjustment"
-        case .travelDay:
-            return "Travel day"
-        case .postArrival:
-            return "Post-arrival"
+            return "Pre-flight prep"
+        case .travelDayOutbound, .travelDay:
+            return "Outbound"
+        case .atDestination, .postArrival:
+            return "At destination"
+        case .preReturn:
+            return "Pre-return prep"
+        case .travelDayReturn:
+            return "Return flight"
+        case .postReturn:
+            return "Home recovery"
+        }
+    }
+    
+    /// Section title for grouping in timeline
+    var sectionTitle: String {
+        switch self {
+        case .preAdjustment:
+            return "PREP"
+        case .travelDayOutbound, .travelDay:
+            return "OUTBOUND"
+        case .atDestination, .postArrival:
+            return "AT DESTINATION"
+        case .preReturn:
+            return "PRE-RETURN"
+        case .travelDayReturn:
+            return "RETURN"
+        case .postReturn:
+            return "RECOVERY"
         }
     }
 }
@@ -161,5 +204,30 @@ struct FamilyMemberSchedule: Identifiable {
         self.id = member.id
         self.member = member
         self.dailySchedules = dailySchedules
+    }
+    
+    /// Group schedules by stage for sectioned display
+    var schedulesByStage: [(stage: ScheduleStage, schedules: [DailySchedule])] {
+        var result: [(ScheduleStage, [DailySchedule])] = []
+        var currentStage: ScheduleStage?
+        var currentGroup: [DailySchedule] = []
+        
+        for schedule in dailySchedules {
+            if schedule.stage != currentStage {
+                if !currentGroup.isEmpty, let stage = currentStage {
+                    result.append((stage, currentGroup))
+                }
+                currentStage = schedule.stage
+                currentGroup = [schedule]
+            } else {
+                currentGroup.append(schedule)
+            }
+        }
+        
+        if !currentGroup.isEmpty, let stage = currentStage {
+            result.append((stage, currentGroup))
+        }
+        
+        return result
     }
 }
