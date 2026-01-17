@@ -33,7 +33,7 @@ struct FamilyView: View {
                     } label: {
                         Image(systemName: "plus")
                     }
-                    .sensoryFeedback(.impact(.light), trigger: showingAddSheet)
+                    .sensoryFeedback(.impact(weight: .light), trigger: showingAddSheet)
                 }
             }
             .sheet(isPresented: $showingAddSheet) {

@@ -59,7 +59,7 @@ struct FlightView: View {
                 Text("Add Flight")
             }
             .buttonStyle(.borderedProminent)
-            .sensoryFeedback(.impact(.light), trigger: showingFlightSheet)
+            .sensoryFeedback(.impact(weight: .light), trigger: showingFlightSheet)
         }
     }
     
@@ -108,7 +108,7 @@ struct FlightView: View {
             
             Image(systemName: "airplane")
                 .font(.title2)
-                .foregroundStyle(.accent)
+                .foregroundStyle(.tint)
             
             VStack {
                 Text(flight.arrivalCity)
