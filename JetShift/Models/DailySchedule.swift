@@ -17,9 +17,43 @@ struct DailySchedule: Identifiable, Equatable {
     let wakeTime: Date
     let stage: ScheduleStage
     
+    /// Strategy message for travel day (e.g., "Stay up as late as possible")
+    let strategyMessage: String?
+    
+    /// Estimated hotel arrival time (flight arrival + buffer)
+    let hotelArrival: Date?
+    
+    /// Travel direction for context
+    let travelDirection: TravelDirection?
+    
+    init(
+        date: Date,
+        dayLabel: String,
+        bedtime: Date,
+        wakeTime: Date,
+        stage: ScheduleStage,
+        strategyMessage: String? = nil,
+        hotelArrival: Date? = nil,
+        travelDirection: TravelDirection? = nil
+    ) {
+        self.date = date
+        self.dayLabel = dayLabel
+        self.bedtime = bedtime
+        self.wakeTime = wakeTime
+        self.stage = stage
+        self.strategyMessage = strategyMessage
+        self.hotelArrival = hotelArrival
+        self.travelDirection = travelDirection
+    }
+    
     /// Whether this schedule is for today
     var isToday: Bool {
         Calendar.current.isDateInToday(date)
+    }
+    
+    /// Whether this is a travel day with a strategy message
+    var hasStrategy: Bool {
+        strategyMessage != nil
     }
     
     /// Formatted bedtime string
@@ -30,6 +64,11 @@ struct DailySchedule: Identifiable, Equatable {
     /// Formatted wake time string
     var formattedWakeTime: String {
         wakeTime.formatted(date: .omitted, time: .shortened)
+    }
+    
+    /// Formatted hotel arrival string
+    var formattedHotelArrival: String? {
+        hotelArrival?.formatted(date: .omitted, time: .shortened)
     }
     
     /// Formatted date string

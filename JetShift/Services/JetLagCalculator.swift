@@ -13,8 +13,17 @@ struct JetLagCalculator {
     /// Number of pre-flight adjustment days
     static let preFlightDays = 3
     
-    /// Number of post-arrival days
-    static let postArrivalDays = 2
+    /// Number of post-arrival days for gradual adjustment
+    static let postArrivalDays = 4
+    
+    /// Buffer time (in hours) from flight arrival to hotel check-in
+    static let hotelArrivalBufferHours = 2
+    
+    /// Late bedtime hour for "stay up late" strategy (westward)
+    static let stayUpLateBedtimeHour = 23 // 11 PM
+    
+    /// Early bedtime hour for "go to bed early" strategy (eastward)
+    static let goToBedEarlyHour = 20 // 8 PM
     
     /// Calculate the complete adjustment schedule for a family member
     /// - Parameters:
@@ -25,12 +34,46 @@ struct JetLagCalculator {
         var schedules: [DailySchedule] = []
         let calendar = Calendar.current
         
-        let timezoneOffset = flight.timezoneOffset
         let direction = flight.travelDirection
         let increment = member.adjustmentIncrement
         let travelDate = flight.departureDate
         
         // Pre-flight adjustment days (3 days before)
+        schedules.append(contentsOf: calculatePreFlightSchedules(
+            for: member,
+            flight: flight,
+            calendar: calendar
+        ))
+        
+        // Travel day (Day 0)
+        schedules.append(calculateTravelDaySchedule(
+            for: member,
+            flight: flight,
+            calendar: calendar
+        ))
+        
+        // Post-arrival days (4 days of gradual adjustment)
+        schedules.append(contentsOf: calculatePostArrivalSchedules(
+            for: member,
+            flight: flight,
+            calendar: calendar
+        ))
+        
+        return schedules
+    }
+    
+    // MARK: - Pre-Flight Calculation
+    
+    private static func calculatePreFlightSchedules(
+        for member: FamilyMember,
+        flight: Flight,
+        calendar: Calendar
+    ) -> [DailySchedule] {
+        var schedules: [DailySchedule] = []
+        let direction = flight.travelDirection
+        let increment = member.adjustmentIncrement
+        let travelDate = flight.departureDate
+        
         for dayOffset in (-preFlightDays)...(-1) {
             guard let date = calendar.date(byAdding: .day, value: dayOffset, to: travelDate) else {
                 continue
@@ -68,48 +111,153 @@ struct JetLagCalculator {
             ))
         }
         
-        // Travel day (Day 0)
-        let destinationBedtime = convertToDestinationTime(
-            member.currentBedtime,
-            from: flight.departureTimezone,
-            to: flight.arrivalTimezone
-        )
-        let destinationWakeTime = convertToDestinationTime(
-            member.currentWakeTime,
-            from: flight.departureTimezone,
-            to: flight.arrivalTimezone
-        )
+        return schedules
+    }
+    
+    // MARK: - Travel Day Calculation
+    
+    private static func calculateTravelDaySchedule(
+        for member: FamilyMember,
+        flight: Flight,
+        calendar: Calendar
+    ) -> DailySchedule {
+        let direction = flight.travelDirection
+        let travelDate = flight.departureDate
         
-        schedules.append(DailySchedule(
+        // Calculate hotel arrival (flight arrival + 2 hour buffer)
+        let hotelArrival = calendar.date(
+            byAdding: .hour,
+            value: hotelArrivalBufferHours,
+            to: flight.arrivalTime
+        ) ?? flight.arrivalTime
+        
+        // Get strategy message and target bedtime based on direction
+        let strategyMessage: String
+        let targetBedtime: Date
+        let targetWakeTime: Date
+        
+        switch direction {
+        case .west:
+            // Westward: Stay up as late as possible
+            strategyMessage = "Stay up as late as possible"
+            targetBedtime = createTime(hour: stayUpLateBedtimeHour, minute: 0, from: travelDate, calendar: calendar)
+            targetWakeTime = createTime(hour: 8, minute: 0, from: travelDate, calendar: calendar)
+            
+        case .east:
+            // Eastward: Go to bed early if tired
+            strategyMessage = "Go to bed early if tired"
+            targetBedtime = createTime(hour: goToBedEarlyHour, minute: 0, from: travelDate, calendar: calendar)
+            targetWakeTime = createTime(hour: 6, minute: 0, from: travelDate, calendar: calendar)
+            
+        case .none:
+            // No timezone change
+            strategyMessage = "Maintain regular schedule"
+            targetBedtime = member.currentBedtime
+            targetWakeTime = member.currentWakeTime
+        }
+        
+        return DailySchedule(
             date: travelDate,
             dayLabel: "Travel Day",
-            bedtime: destinationBedtime,
-            wakeTime: destinationWakeTime,
-            stage: .travelDay
-        ))
+            bedtime: targetBedtime,
+            wakeTime: targetWakeTime,
+            stage: .travelDay,
+            strategyMessage: strategyMessage,
+            hotelArrival: hotelArrival,
+            travelDirection: direction
+        )
+    }
+    
+    // MARK: - Post-Arrival Calculation
+    
+    private static func calculatePostArrivalSchedules(
+        for member: FamilyMember,
+        flight: Flight,
+        calendar: Calendar
+    ) -> [DailySchedule] {
+        var schedules: [DailySchedule] = []
+        let direction = flight.travelDirection
+        let increment = member.adjustmentIncrement
+        let travelDate = flight.departureDate
         
-        // Post-arrival days (Days 1-2)
+        // Target bedtime in destination (member's normal bedtime)
+        let targetBedtime = member.currentBedtime
+        let targetWakeTime = member.currentWakeTime
+        
+        // Starting point for post-arrival (from travel day strategy)
+        let startingBedtime: Date
+        let startingWakeTime: Date
+        
+        switch direction {
+        case .west:
+            // Started late (11pm), need to shift EARLIER toward target
+            startingBedtime = createTime(hour: stayUpLateBedtimeHour, minute: 0, from: travelDate, calendar: calendar)
+            startingWakeTime = createTime(hour: 8, minute: 0, from: travelDate, calendar: calendar)
+            
+        case .east:
+            // Started early (8pm), need to shift LATER toward target
+            startingBedtime = createTime(hour: goToBedEarlyHour, minute: 0, from: travelDate, calendar: calendar)
+            startingWakeTime = createTime(hour: 6, minute: 0, from: travelDate, calendar: calendar)
+            
+        case .none:
+            startingBedtime = targetBedtime
+            startingWakeTime = targetWakeTime
+        }
+        
         for dayOffset in 1...postArrivalDays {
             guard let date = calendar.date(byAdding: .day, value: dayOffset, to: travelDate) else {
                 continue
             }
             
+            let adjustedBedtime: Date
+            let adjustedWakeTime: Date
+            
+            // Calculate gradual shift toward target
+            let totalAdjustmentMinutes = dayOffset * increment
+            
+            switch direction {
+            case .west:
+                // Westward: shift bedtime EARLIER each day (toward normal)
+                adjustedBedtime = adjustTime(startingBedtime, byMinutes: -totalAdjustmentMinutes)
+                adjustedWakeTime = adjustTime(startingWakeTime, byMinutes: -totalAdjustmentMinutes)
+                
+            case .east:
+                // Eastward: shift bedtime LATER each day (toward normal)
+                adjustedBedtime = adjustTime(startingBedtime, byMinutes: totalAdjustmentMinutes)
+                adjustedWakeTime = adjustTime(startingWakeTime, byMinutes: totalAdjustmentMinutes)
+                
+            case .none:
+                adjustedBedtime = targetBedtime
+                adjustedWakeTime = targetWakeTime
+            }
+            
             schedules.append(DailySchedule(
                 date: date,
                 dayLabel: "Day \(dayOffset)",
-                bedtime: destinationBedtime,
-                wakeTime: destinationWakeTime,
-                stage: .postArrival
+                bedtime: adjustedBedtime,
+                wakeTime: adjustedWakeTime,
+                stage: .postArrival,
+                travelDirection: direction
             ))
         }
         
         return schedules
     }
     
+    // MARK: - Helper Methods
+    
     /// Adjust a time by a specified number of minutes
     private static func adjustTime(_ time: Date, byMinutes minutes: Int) -> Date {
         let calendar = Calendar.current
         return calendar.date(byAdding: .minute, value: minutes, to: time) ?? time
+    }
+    
+    /// Create a time on a specific date
+    private static func createTime(hour: Int, minute: Int, from date: Date, calendar: Calendar) -> Date {
+        var components = calendar.dateComponents([.year, .month, .day], from: date)
+        components.hour = hour
+        components.minute = minute
+        return calendar.date(from: components) ?? date
     }
     
     /// Convert a time from one timezone to another
@@ -123,12 +271,10 @@ struct JetLagCalculator {
             return time
         }
         
-        // Calculate the offset difference
         let sourceOffset = sourceTZ.secondsFromGMT(for: time)
         let destOffset = destTZ.secondsFromGMT(for: time)
         let difference = destOffset - sourceOffset
         
-        // Adjust the time by the difference
         return time.addingTimeInterval(TimeInterval(difference))
     }
     
