@@ -167,8 +167,25 @@ struct FamilyMemberTimelineRow: View {
                 .foregroundStyle(.secondary)
             
             VStack(alignment: .leading, spacing: 2) {
-                Text(schedule.member.name)
-                    .font(.headline)
+                HStack(spacing: 6) {
+                    Text(schedule.member.name)
+                        .font(.headline)
+                    
+                    // Show custom strategy badge if member has one
+                    if schedule.member.usesCustomStrategy, let strategy = schedule.member.customStrategy {
+                        HStack(spacing: 4) {
+                            Image(systemName: strategy.icon)
+                                .font(.caption2)
+                            Text(strategy.displayName)
+                                .font(.caption2)
+                        }
+                        .foregroundStyle(strategy.color)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(strategy.color.opacity(0.15), in: Capsule())
+                    }
+                }
+                
                 Text("\(schedule.member.age) years old • \(schedule.member.adjustmentIncrement) min shifts")
                     .font(.caption)
                     .foregroundStyle(.secondary)

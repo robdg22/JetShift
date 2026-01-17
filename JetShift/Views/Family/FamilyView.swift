@@ -107,11 +107,26 @@ struct FamilyMemberRow: View {
                             .font(.caption2)
                             .foregroundStyle(.blue)
                     }
+                    
+                    // Show custom strategy badge
+                    if member.usesCustomStrategy, let strategy = member.customStrategy {
+                        Image(systemName: strategy.icon)
+                            .font(.caption2)
+                            .foregroundStyle(strategy.color)
+                    }
                 }
                 
-                Text("\(member.age) years old")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 4) {
+                    Text("\(member.age) years old")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    
+                    if member.usesCustomStrategy, let strategy = member.customStrategy {
+                        Text("• \(strategy.displayName)")
+                            .font(.caption)
+                            .foregroundStyle(strategy.color)
+                    }
+                }
             }
             
             Spacer()

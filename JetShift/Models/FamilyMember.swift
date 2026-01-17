@@ -23,6 +23,12 @@ final class FamilyMember {
     /// The latest time they must wake by on normal days (work/school)
     var wakeByTime: Date
     
+    /// Whether this member uses a custom strategy (vs trip default)
+    var usesCustomStrategy: Bool
+    
+    /// Custom strategy data (if usesCustomStrategy is true)
+    var customStrategyData: Data?
+    
     init(
         id: UUID = UUID(),
         name: String,
@@ -31,6 +37,8 @@ final class FamilyMember {
         currentWakeTime: Date,
         hasWakeConstraint: Bool = true,
         wakeByTime: Date? = nil,
+        usesCustomStrategy: Bool = false,
+        customStrategy: TripStrategy? = nil,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -40,7 +48,31 @@ final class FamilyMember {
         self.currentWakeTime = currentWakeTime
         self.hasWakeConstraint = hasWakeConstraint
         self.wakeByTime = wakeByTime ?? FamilyMember.defaultWakeByTime(for: age)
+        self.usesCustomStrategy = usesCustomStrategy
+        self.customStrategyData = customStrategy.flatMap { try? JSONEncoder().encode($0) }
         self.createdAt = createdAt
+    }
+    
+    /// The custom strategy for this member (nil = use trip default)
+    var customStrategy: TripStrategy? {
+        get {
+            guard usesCustomStrategy, let data = customStrategyData else { return nil }
+            return try? JSONDecoder().decode(TripStrategy.self, from: data)
+        }
+        set {
+            if let strategy = newValue {
+                customStrategyData = try? JSONEncoder().encode(strategy)
+                usesCustomStrategy = true
+            } else {
+                customStrategyData = nil
+                usesCustomStrategy = false
+            }
+        }
+    }
+    
+    /// Returns the effective strategy for this member given a trip's default
+    func effectiveStrategy(tripDefault: TripStrategy) -> TripStrategy {
+        customStrategy ?? tripDefault
     }
     
     /// Default wake-by time based on age (7am for most, earlier for young kids)

@@ -301,6 +301,11 @@ struct TripSetupView: View {
         modelContext.insert(trip)
         didSave.toggle()
         dismiss()
+        
+        // Navigate to Schedule tab to show the generated schedules
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            AppState.shared.showSchedule()
+        }
     }
 }
 

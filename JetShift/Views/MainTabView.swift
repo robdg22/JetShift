@@ -9,7 +9,7 @@ import SwiftUI
 import SwiftData
 
 struct MainTabView: View {
-    @State private var selectedTab: Tab = .family
+    @State private var appState = AppState.shared
     
     enum Tab: String, CaseIterable {
         case family = "Family"
@@ -26,7 +26,7 @@ struct MainTabView: View {
     }
     
     var body: some View {
-        TabView(selection: $selectedTab) {
+        TabView(selection: $appState.selectedTab) {
             ForEach(Tab.allCases, id: \.self) { tab in
                 tabContent(for: tab)
                     .tabItem {
@@ -35,7 +35,7 @@ struct MainTabView: View {
                     .tag(tab)
             }
         }
-        .sensoryFeedback(.selection, trigger: selectedTab)
+        .sensoryFeedback(.selection, trigger: appState.selectedTab)
     }
     
     @ViewBuilder

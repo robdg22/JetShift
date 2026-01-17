@@ -43,7 +43,9 @@ struct JetLagCalculator {
         
         var schedules: [DailySchedule] = []
         let calendar = Calendar.current
-        let strategy = trip.strategy
+        
+        // Use member's custom strategy if set, otherwise trip default
+        let strategy = member.effectiveStrategy(tripDefault: trip.strategy)
         
         // No adjustment strategy - just show travel days with no schedule changes
         if case .noAdjustment = strategy {

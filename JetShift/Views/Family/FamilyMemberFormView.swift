@@ -39,6 +39,8 @@ struct FamilyMemberFormView: View {
     @State private var wakeTime: Date = Date()
     @State private var hasWakeConstraint: Bool = true
     @State private var wakeByTime: Date = Date()
+    @State private var usesCustomStrategy: Bool = false
+    @State private var customStrategy: TripStrategy = .partialAdjustment(percentage: 0.6)
     
     @State private var showValidationError = false
     @State private var didSave = false
@@ -57,6 +59,8 @@ struct FamilyMemberFormView: View {
             _wakeTime = State(initialValue: member.currentWakeTime)
             _hasWakeConstraint = State(initialValue: member.hasWakeConstraint)
             _wakeByTime = State(initialValue: member.wakeByTime)
+            _usesCustomStrategy = State(initialValue: member.usesCustomStrategy)
+            _customStrategy = State(initialValue: member.customStrategy ?? .partialAdjustment(percentage: 0.6))
         } else {
             _bedtime = State(initialValue: FamilyMember.suggestedBedtime(for: 30))
             _wakeTime = State(initialValue: FamilyMember.suggestedWakeTime(for: 30))
@@ -125,6 +129,39 @@ struct FamilyMemberFormView: View {
                 }
                 
                 Section {
+                    Toggle("Use Custom Strategy", isOn: $usesCustomStrategy.animation(.smooth))
+                    
+                    if usesCustomStrategy {
+                        Picker("Strategy", selection: $customStrategy) {
+                            ForEach(TripStrategy.allMainTypes, id: \.self) { strategy in
+                                HStack {
+                                    Image(systemName: strategy.icon)
+                                        .foregroundStyle(strategy.color)
+                                    Text(strategy.displayName)
+                                }
+                                .tag(strategy)
+                            }
+                        }
+                        
+                        HStack {
+                            Image(systemName: customStrategy.icon)
+                                .foregroundStyle(customStrategy.color)
+                            Text(customStrategy.shortDescription)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                } header: {
+                    Text("Adjustment Strategy")
+                } footer: {
+                    if usesCustomStrategy {
+                        Text("This person will use their own strategy instead of the trip default.")
+                    } else {
+                        Text("By default, this person will use the trip's adjustment strategy.")
+                    }
+                }
+                
+                Section {
                     Text("Recommended sleep: \(FamilyMember(name: "", age: age, currentBedtime: Date(), currentWakeTime: Date()).recommendedSleepHours.lowerBound)-\(FamilyMember(name: "", age: age, currentBedtime: Date(), currentWakeTime: Date()).recommendedSleepHours.upperBound) hours")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -169,7 +206,9 @@ struct FamilyMemberFormView: View {
                 currentBedtime: bedtime,
                 currentWakeTime: wakeTime,
                 hasWakeConstraint: hasWakeConstraint,
-                wakeByTime: wakeByTime
+                wakeByTime: wakeByTime,
+                usesCustomStrategy: usesCustomStrategy,
+                customStrategy: usesCustomStrategy ? customStrategy : nil
             )
             modelContext.insert(member)
             
@@ -180,6 +219,8 @@ struct FamilyMemberFormView: View {
             member.currentWakeTime = wakeTime
             member.hasWakeConstraint = hasWakeConstraint
             member.wakeByTime = wakeByTime
+            member.usesCustomStrategy = usesCustomStrategy
+            member.customStrategy = usesCustomStrategy ? customStrategy : nil
         }
         
         didSave.toggle()
