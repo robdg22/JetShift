@@ -75,6 +75,16 @@ struct TripSetupView: View {
         )
     }
     
+    // Section identifiers for scroll stability
+    private enum FormSection: String {
+        case tripName
+        case outbound
+        case returnToggle
+        case returnFlight
+        case tripSummary
+        case strategy
+    }
+    
     var body: some View {
         NavigationStack {
             Form {
@@ -82,6 +92,7 @@ struct TripSetupView: View {
                 Section("Trip Name") {
                     TextField("e.g., Summer Europe Trip", text: $tripName)
                 }
+                .id(FormSection.tripName)
                 
                 // Outbound flight
                 Section("Outbound Flight") {
@@ -95,11 +106,13 @@ struct TripSetupView: View {
                     DatePicker("Arrival Date", selection: $outboundArrivalDate, in: outboundDepartureDate..., displayedComponents: .date)
                     DatePicker("Arrival Time", selection: $outboundArrivalTime, displayedComponents: .hourAndMinute)
                 }
+                .id(FormSection.outbound)
                 
                 // Return flight toggle
                 Section {
                     Toggle("Include Return Flight", isOn: $includeReturnFlight.animation(.smooth))
                 }
+                .id(FormSection.returnToggle)
                 
                 // Return flight details
                 if includeReturnFlight {
@@ -123,12 +136,14 @@ struct TripSetupView: View {
                         DatePicker("Arrival Date", selection: $returnArrivalDate, in: returnDepartureDate..., displayedComponents: .date)
                         DatePicker("Arrival Time", selection: $returnArrivalTime, displayedComponents: .hourAndMinute)
                     }
+                    .id(FormSection.returnFlight)
                     
                     // Trip summary
                     Section("Trip Summary") {
                         LabeledContent("Days at Destination", value: "\(daysAtDestination)")
                         LabeledContent("Timezone Shift", value: formattedTimezoneOffset)
                     }
+                    .id(FormSection.tripSummary)
                 }
                 
                 // Strategy selection
@@ -166,7 +181,9 @@ struct TripSetupView: View {
                         }
                     }
                 }
+                .id(FormSection.strategy)
             }
+            .scrollDismissesKeyboard(.interactively)
             .navigationTitle("New Trip")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
