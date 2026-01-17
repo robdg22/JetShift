@@ -350,43 +350,78 @@ struct JetLagCalculator {
         let preFlightAdjustment = min(preFlightDays * increment, targetAdjustmentMinutes)
         
         // Post-arrival adjustment days (gradual adjustment to target)
+        // 
+        // WESTBOUND: Body clock is AHEAD of local time
+        //   - You'll wake up too EARLY (body thinks it's later than it is)
+        //   - You'll feel sleepy too EARLY in the evening
+        //   - Strategy: Show early wake times that progress LATER toward normal
+        //   - Bedtime: Keep it at target (encourage staying up)
+        //
+        // EASTBOUND: Body clock is BEHIND local time
+        //   - You'll want to sleep too LATE (body thinks it's earlier than it is)
+        //   - You'll want to wake too LATE in the morning
+        //   - Strategy: Show earlier bedtimes that progress LATER toward normal
+        //   - Wake time: Keep at target (force early waking)
+        
         for dayOffset in 1...postArrivalDaysToShow {
             guard let date = calendar.date(byAdding: .day, value: dayOffset, to: outbound.departureDate) else { continue }
             
             let postArrivalAdjustment = min(dayOffset * increment, targetAdjustmentMinutes - preFlightAdjustment)
             let totalAdjusted = preFlightAdjustment + postArrivalAdjustment
+            let remainingOffsetMinutes = max(0, targetAdjustmentMinutes - totalAdjusted)
             
-            let adjustedBedtime: Date
-            let adjustedWakeTime: Date
+            var adjustedBedtime: Date
+            var adjustedWakeTime: Date
             
-            // Start from travel day position and adjust toward target
+            // Get the member's normal/target times
+            let normalBedtimeHour = Calendar.current.component(.hour, from: member.currentBedtime)
+            let normalBedtimeMinute = Calendar.current.component(.minute, from: member.currentBedtime)
+            let normalWakeHour = Calendar.current.component(.hour, from: member.currentWakeTime)
+            let normalWakeMinute = Calendar.current.component(.minute, from: member.currentWakeTime)
+            
+            let targetBedtime = createTime(hour: normalBedtimeHour, minute: normalBedtimeMinute, from: date, calendar: calendar)
+            let targetWakeTime = createTime(hour: normalWakeHour, minute: normalWakeMinute, from: date, calendar: calendar)
+            
             switch direction {
             case .west:
-                let startBedtime = createTime(hour: stayUpLateBedtimeHour, minute: 0, from: date, calendar: calendar)
-                let startWakeTime = createTime(hour: 8, minute: 0, from: date, calendar: calendar)
-                adjustedBedtime = adjustTime(startBedtime, byMinutes: -postArrivalAdjustment)
-                adjustedWakeTime = adjustTime(startWakeTime, byMinutes: -postArrivalAdjustment)
+                // WESTBOUND: Body wakes EARLY, sleeps EARLY
+                // Wake time: Start early (body wakes you), progress LATER toward normal
+                // Bedtime: Stay at normal (encourage staying up late)
+                let earlyWakeOffset = remainingOffsetMinutes  // How early body will wake
+                adjustedWakeTime = adjustTime(targetWakeTime, byMinutes: -earlyWakeOffset)
+                adjustedBedtime = targetBedtime  // Try to stay up until normal bedtime
                 
             case .east:
-                let startBedtime = createTime(hour: eastwardTargetBedtimeHour, minute: 0, from: date, calendar: calendar)
-                let startWakeTime = createTime(hour: 7, minute: 0, from: date, calendar: calendar)
-                adjustedBedtime = adjustTime(startBedtime, byMinutes: postArrivalAdjustment)
-                adjustedWakeTime = adjustTime(startWakeTime, byMinutes: postArrivalAdjustment)
+                // EASTBOUND: Body wakes LATE, sleeps LATE  
+                // Bedtime: Start early (force sleep), progress LATER toward normal
+                // Wake time: Stay at normal (force early waking with alarm)
+                let earlyBedOffset = remainingOffsetMinutes  // How much earlier to go to bed
+                adjustedBedtime = adjustTime(targetBedtime, byMinutes: -earlyBedOffset)
+                adjustedWakeTime = targetWakeTime  // Wake at target time
                 
             case .none:
-                adjustedBedtime = member.currentBedtime
-                adjustedWakeTime = member.currentWakeTime
+                adjustedBedtime = targetBedtime
+                adjustedWakeTime = targetWakeTime
             }
             
-            // Body clock offset
-            let remainingOffset = max(0, targetAdjustmentMinutes - totalAdjusted)
-            let bodyClockOffset = direction == .east ? -remainingOffset : remainingOffset
+            // Apply wake constraint
+            let clampedWakeTime = clampToWakeConstraint(wakeTime: adjustedWakeTime, member: member, calendar: calendar)
+            let finalBedtime = adjustBedtimeForClampedWake(
+                originalBedtime: adjustedBedtime,
+                originalWakeTime: adjustedWakeTime,
+                clampedWakeTime: clampedWakeTime,
+                member: member,
+                calendar: calendar
+            )
+            
+            // Body clock offset (positive = ahead of local, negative = behind)
+            let bodyClockOffset = direction == .east ? -remainingOffsetMinutes : remainingOffsetMinutes
             
             schedules.append(DailySchedule(
                 date: date,
                 dayLabel: "Day \(dayOffset)",
-                bedtime: adjustedBedtime,
-                wakeTime: adjustedWakeTime,
+                bedtime: finalBedtime,
+                wakeTime: clampedWakeTime,
                 stage: .atDestination,
                 travelDirection: direction,
                 bodyClockOffsetMinutes: direction == .none ? 0 : bodyClockOffset
@@ -510,37 +545,58 @@ struct JetLagCalculator {
             guard let date = calendar.date(byAdding: .day, value: dayOffset, to: travelDate) else { continue }
             
             let postArrivalAdjustment = min(dayOffset * increment, targetAdjustmentMinutes - preFlightAdjustment)
+            let totalAdjusted = preFlightAdjustment + postArrivalAdjustment
+            let remainingOffsetMinutes = max(0, targetAdjustmentMinutes - totalAdjusted)
             
-            let adjustedBedtime: Date
-            let adjustedWakeTime: Date
+            var adjustedBedtime: Date
+            var adjustedWakeTime: Date
+            
+            // Get the member's normal/target times
+            let normalBedtimeHour = Calendar.current.component(.hour, from: member.currentBedtime)
+            let normalBedtimeMinute = Calendar.current.component(.minute, from: member.currentBedtime)
+            let normalWakeHour = Calendar.current.component(.hour, from: member.currentWakeTime)
+            let normalWakeMinute = Calendar.current.component(.minute, from: member.currentWakeTime)
+            
+            let targetBedtime = createTime(hour: normalBedtimeHour, minute: normalBedtimeMinute, from: date, calendar: calendar)
+            let targetWakeTime = createTime(hour: normalWakeHour, minute: normalWakeMinute, from: date, calendar: calendar)
             
             switch direction {
             case .west:
-                let startBedtime = createTime(hour: stayUpLateBedtimeHour, minute: 0, from: date, calendar: calendar)
-                let startWakeTime = createTime(hour: 8, minute: 0, from: date, calendar: calendar)
-                adjustedBedtime = adjustTime(startBedtime, byMinutes: -postArrivalAdjustment)
-                adjustedWakeTime = adjustTime(startWakeTime, byMinutes: -postArrivalAdjustment)
+                // WESTBOUND: Body wakes EARLY, sleeps EARLY
+                // Wake time: Start early, progress LATER toward normal
+                // Bedtime: Stay at normal (encourage staying up)
+                adjustedWakeTime = adjustTime(targetWakeTime, byMinutes: -remainingOffsetMinutes)
+                adjustedBedtime = targetBedtime
                 
             case .east:
-                let startBedtime = createTime(hour: eastwardTargetBedtimeHour, minute: 0, from: date, calendar: calendar)
-                let startWakeTime = createTime(hour: 7, minute: 0, from: date, calendar: calendar)
-                adjustedBedtime = adjustTime(startBedtime, byMinutes: postArrivalAdjustment)
-                adjustedWakeTime = adjustTime(startWakeTime, byMinutes: postArrivalAdjustment)
+                // EASTBOUND: Body wakes LATE, sleeps LATE
+                // Bedtime: Start early, progress LATER toward normal
+                // Wake time: Stay at normal
+                adjustedBedtime = adjustTime(targetBedtime, byMinutes: -remainingOffsetMinutes)
+                adjustedWakeTime = targetWakeTime
                 
             case .none:
-                adjustedBedtime = member.currentBedtime
-                adjustedWakeTime = member.currentWakeTime
+                adjustedBedtime = targetBedtime
+                adjustedWakeTime = targetWakeTime
             }
             
-            let totalAdjusted = preFlightAdjustment + postArrivalAdjustment
-            let remainingOffset = max(0, targetAdjustmentMinutes - totalAdjusted)
-            let bodyClockOffset = direction == .east ? -remainingOffset : remainingOffset
+            // Apply wake constraint
+            let clampedWakeTime = clampToWakeConstraint(wakeTime: adjustedWakeTime, member: member, calendar: calendar)
+            let finalBedtime = adjustBedtimeForClampedWake(
+                originalBedtime: adjustedBedtime,
+                originalWakeTime: adjustedWakeTime,
+                clampedWakeTime: clampedWakeTime,
+                member: member,
+                calendar: calendar
+            )
+            
+            let bodyClockOffset = direction == .east ? -remainingOffsetMinutes : remainingOffsetMinutes
             
             schedules.append(DailySchedule(
                 date: date,
                 dayLabel: "Day \(dayOffset)",
-                bedtime: adjustedBedtime,
-                wakeTime: adjustedWakeTime,
+                bedtime: finalBedtime,
+                wakeTime: clampedWakeTime,
                 stage: .postArrival,
                 travelDirection: direction,
                 bodyClockOffsetMinutes: direction == .none ? 0 : bodyClockOffset
