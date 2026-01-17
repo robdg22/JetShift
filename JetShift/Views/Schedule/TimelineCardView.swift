@@ -49,10 +49,10 @@ struct TimelineCardView: View {
         }
         .padding()
         .frame(width: schedule.hasStrategy ? 170 : 150)
-        .glassEffect()
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
         .overlay {
             if schedule.isToday {
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: 12)
                     .strokeBorder(schedule.stage.color, lineWidth: 2)
             }
         }
