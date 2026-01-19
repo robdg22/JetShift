@@ -12,6 +12,16 @@ struct MainTabView: View {
     @State private var appState = AppState.shared
     @State private var tabBarImageViews: [Int: UIImageView] = [:]
     
+    /// Current day of month for dynamic calendar icon
+    private var currentDayOfMonth: Int {
+        Calendar.current.component(.day, from: Date())
+    }
+    
+    /// Dynamic calendar icon showing current day
+    private var scheduleIcon: String {
+        "\(currentDayOfMonth).square"
+    }
+    
     enum Tab: Int, CaseIterable {
         case family = 0
         case trip = 1
@@ -25,11 +35,12 @@ struct MainTabView: View {
             }
         }
         
+        /// Base icon (schedule uses dynamic icon from parent view)
         var icon: String {
             switch self {
             case .family: return "person.3.fill"
             case .trip: return "airplane.departure"
-            case .schedule: return "calendar"
+            case .schedule: return "calendar" // Fallback, overridden in view
             }
         }
         
@@ -37,11 +48,11 @@ struct MainTabView: View {
         var symbolEffect: any DiscreteSymbolEffect & SymbolEffect {
             switch self {
             case .family:
-                return .bounce
+                return .wiggle.byLayer
             case .trip:
                 return .bounce.up.byLayer
             case .schedule:
-                return .bounce
+                return .wiggle.byLayer
             }
         }
     }
@@ -51,7 +62,7 @@ struct MainTabView: View {
             ForEach(Tab.allCases, id: \.self) { tab in
                 tabContent(for: tab)
                     .tabItem {
-                        Label(tab.title, systemImage: tab.icon)
+                        Label(tab.title, systemImage: iconForTab(tab))
                     }
                     .tag(tab)
             }
@@ -65,6 +76,16 @@ struct MainTabView: View {
             animateTabIcon(for: newValue)
         }
         .sensoryFeedback(.selection, trigger: appState.selectedTab)
+    }
+    
+    /// Returns the appropriate icon for a tab (dynamic for schedule)
+    private func iconForTab(_ tab: Tab) -> String {
+        switch tab {
+        case .schedule:
+            return scheduleIcon
+        default:
+            return tab.icon
+        }
     }
     
     @ViewBuilder
