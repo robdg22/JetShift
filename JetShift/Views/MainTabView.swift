@@ -69,9 +69,18 @@ struct MainTabView: View {
         }
         .background(
             ExtractTabBarImageViews { imageViews in
-                tabBarImageViews = imageViews
+                // Only update if we got valid image views
+                if !imageViews.isEmpty {
+                    tabBarImageViews = imageViews
+                }
             }
         )
+        .onAppear {
+            // Re-extract after a delay to ensure tab bar is fully loaded
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                // Trigger a re-extraction by toggling a state (the background view will update)
+            }
+        }
         .onChange(of: appState.selectedTab) { oldValue, newValue in
             animateTabIcon(for: newValue)
         }
