@@ -29,6 +29,20 @@ enum TripStrategy: Codable, Hashable, Sendable {
         }
     }
     
+    /// Short display name for compact UI (e.g., badges)
+    var shortDisplayName: String {
+        switch self {
+        case .fullAdjustment:
+            return "Full"
+        case .partialAdjustment(let percentage):
+            return "\(Int(percentage * 100))%"
+        case .minimizeTotal:
+            return "Min"
+        case .noAdjustment:
+            return "None"
+        }
+    }
+    
     /// Short description of the strategy
     var shortDescription: String {
         switch self {
